@@ -1,0 +1,627 @@
+\documentclass[11pt,a4paper,twoside]{article}
+
+% =========================
+% Packages
+% =========================
+\usepackage[margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{setspace}
+\usepackage{amsmath,amssymb,amsfonts,mathtools}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{makecell}
+\usepackage{adjustbox}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{caption}
+\usepackage{pdflscape}
+\usepackage{fancyhdr}
+
+% =========================
+% Formatting
+% =========================
+\setstretch{1.1}
+\captionsetup{font=small,labelfont=bf}
+\hypersetup{
+    colorlinks=true,
+    linkcolor=black,
+    citecolor=black,
+    urlcolor=blue
+}
+\setlength{\parindent}{1.2em}
+\setlength{\parskip}{0.4em}
+\raggedbottom
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\graphicspath{{figures/}{./}}
+
+% =========================
+% Header / Footer
+% =========================
+\pagestyle{fancy}
+\fancyhf{}
+
+\fancyhead[RO]{\small Explainable Financial Anomaly Detection\hspace{1em}\thepage}
+\fancyhead[LE]{\small\thepage\hspace{1em}Thu Le et al.}
+
+\fancyfoot{}
+\renewcommand{\headrulewidth}{0pt}
+\renewcommand{\footrulewidth}{0pt}
+
+\fancypagestyle{plain}{
+    \fancyhf{}
+    \fancyhead[RO]{\small Explainable Financial Anomaly Detection\hspace{1em}\thepage}
+    \fancyhead[LE]{\small\thepage\hspace{1em}Thu Le et al.}
+    \fancyfoot{}
+    \renewcommand{\headrulewidth}{0pt}
+    \renewcommand{\footrulewidth}{0pt}
+}
+
+% =========================
+% Helper macros
+% =========================
+\newcommand{\figureplaceholder}[2]{%
+    \fbox{%
+        \begin{minipage}[c][0.24\textheight][c]{0.92\linewidth}
+            \centering
+            \textbf{Figure placeholder}\\[0.5em]
+            \texttt{\detokenize{#1}}\\[0.5em]
+            #2
+        \end{minipage}
+    }%
+}
+
+\newcommand{\tableplaceholder}[2]{%
+    \fbox{%
+        \begin{minipage}[c][0.13\textheight][c]{0.92\linewidth}
+            \centering
+            \textbf{Table placeholder}\\[0.5em]
+            \texttt{\detokenize{#1}}\\[0.5em]
+            #2
+        \end{minipage}
+    }%
+}
+
+\newcommand{\insertfigureorplaceholder}[2]{%
+    \IfFileExists{#1}
+        {\includegraphics[width=\linewidth]{#1}}
+        {\figureplaceholder{#1}{#2}}%
+}
+
+% =========================
+% Title
+% =========================
+\title{\textbf{Explainable Financial Anomaly Detection with Event Grounding and Counterfactual Validation}}
+
+\author{%
+\begin{tabular}{c}
+Thu Le\textsuperscript{1}[0009-0008-3480-8311], Nhu Nguyen\textsuperscript{2}[0009-0004-3727-9778],\\
+Duc Dat\textsuperscript{3}[0009-0008-8234-4443], and Ngoc Minh\textsuperscript{4,*}[0009-0000-6917-3223]\\[0.45em]
+FPT University, Ho Chi Minh Campus, Vietnam\\[0.25em]
+\small\texttt{thulvm@fpt.edu.vn}, \texttt{nhunqk@fpt.edu.vn},\\
+\small\texttt{datddse180784@fpt.edu.vn}, \texttt{minhtn1412@gmail.com}*
+\end{tabular}
+}
+\date{}
+\begin{document}
+
+\maketitle
+\thispagestyle{empty}
+% =========================
+% Abstract
+% =========================
+\begin{abstract}
+Financial anomaly analysis often stops at anomaly scores, which offer limited support for analysts. This paper presents FinAnomX, an offline-first system for explainable financial anomaly analysis that integrates market and macroeconomic data. The proposed pipeline combines two anomaly branches, a PatchTST residual branch and a TranAD reconstruction branch, with numeric attribution, event grounding, and counterfactual validation to convert raw anomaly signals into evidence-grounded explanations. Evaluated on AMZN, MSFT, NVDA, and TSLA over 2018--2024 with a strict chronological train/validation/test split, FinAnomX identified 25 episode peaks in the 2023--2024 analysis window. The explanation layer achieved a faithfulness pass rate of 1.0000, mean top-1 grounding confidence of 0.7948, full-text evidence coverage of 84\%, and strong counterfactual support in 84\% of grounded cases.
+\end{abstract}
+
+\noindent\textbf{Keywords:} Financial Anomaly Detection, Explainable AI (XAI), Time Series Transformers, PatchTST, TranAD, Counterfactual Validation, Event Grounding, GDELT.
+
+% =========================
+% 1. Introduction
+% =========================
+\section{Introduction}
+
+Financial anomalies become analytically beneficial only when such anomalies can be linked to a real-world event like earnings announcement, macroeconomic shock and market sentiment shift. Unfortunately, the majority of existing systems consider detection performance and model interpretability separately, which results in limited interpretability when given only raw anomaly scores \cite{xing2025, zhang2025}. They get the anomaly score and have to look for a plausible explanation themselves, which is a more manual and time-consuming process. FinAnomX fills this gap by setting anomaly detection as a triggering layer for a broader evidence-grounded explanation pipeline, treated in an offline-first mode, in association with market and macroeconomic data through multi-modal time series \cite{xing2025, zhang2025}. The numerical signals are then processed to ground the narratives so that detected anomalies can be linked to external evidence that is interpretable to enable a more efficient form of risk-monitoring.
+
+FinAnomX has five stages: episode identification, numeric attribution \cite{arrieta2020}, event retrieval and ranking, counterfactual validation \cite{verma2020, wachter2017}, and artifact delivery via a dashboard and retrieval-augmented chatbot. This is done by combining a PatchTST forecasting-residual branch with a TranAD reconstruction branch to identify multi-dimensional deviations \cite{nie2023, tuli2022}. The signals are then grounded to external news evidence, validated by counterfactual query ablations to ensure the reliability of grounded causes. Instead of suggesting a detector architecture as a standalone solution, FinAnomX presents a composite pipeline offering anomaly triggering, numeric attribution, article-level event grounding, and counterfactual validation capabilities for analyst-facing financial risk monitoring. Hence the system provides a mechanism to convert raw anomaly signals into transparent and testable explanations.
+
+% =========================
+% 2. Related Work
+% =========================
+\section{Related Work}
+
+Prior work related to FinAnomX falls into three strands. The first strand covers explainable anomaly detection, where existing studies explain internal anomaly mechanisms or align abnormal signals with auxiliary modalities. Li and Fan~\cite{li2025}, for example, analyze heterogeneous anomaly mechanisms in financial networks, while Hu et al.~\cite{hu2026} show that time-text alignment can improve anomaly analysis. However, these studies do not identify an article-level cause for a stock-date anomaly in an analyst-facing financial setting. The second strand concerns explainable stock forecasting. \c{C}alık et al.~\cite{calik2025} improve transformer-based forecasting interpretability through SHAP and LIME, but their objective remains forecast interpretation rather than anomaly explanation grounded in external evidence. The third strand concerns strong time-series backbones---following the recent success of Transformer-based models in temporal tasks \cite{zeng2023, liu2024}---such as PatchTST~\cite{nie2023} and TranAD~\cite{tuli2022}, which provide effective forecasting and reconstruction signals for anomaly detection but remain signal-level models without event grounding or counterfactual testing. FinAnomX integrates these strands into a single offline-first pipeline for anomaly scoring, numeric attribution, article-level grounding, and counterfactual validation. Furthermore, the broader literature has increasingly adopted Explainable AI (XAI) and Transformer architectures for various financial applications, including stock market anomaly detection \cite{siahmaki2023}, transaction monitoring \cite{bhattacharyya2024}, and fraud detection decision-making systems \cite{luo2025, jin2025}. However, these systems often lack the external event grounding provided by FinAnomX.
+
+\begingroup
+\scriptsize
+\setlength{\tabcolsep}{3pt}
+\renewcommand{\arraystretch}{1.18}
+
+\begin{longtable}{p{1.8cm} p{2.1cm} p{2.1cm} p{1.9cm} p{1.9cm} p{3.8cm}}
+\caption{Comparison with prior works.}
+\label{tab:comparison_with_prior_works} \\
+
+\toprule
+\textbf{Study} &
+\textbf{Main focus} &
+\textbf{Explanation level} &
+\textbf{Article-level event grounding} &
+\textbf{\makecell{Counter-\\factual\\validation}} &
+\textbf{Main gap relative to FinAnomX} \\
+\midrule
+\endfirsthead
+
+\toprule
+\textbf{Study} &
+\textbf{Main focus} &
+\textbf{Explanation level} &
+\textbf{Article-level event grounding} &
+\textbf{\makecell{Counter-\\factual\\validation}} &
+\textbf{Main gap relative to FinAnomX} \\
+\midrule
+\endhead
+
+\bottomrule
+\endfoot
+
+Li and Fan~\cite{li2025}
+&
+Explain heterogeneous anomalies in financial networks
+&
+Mechanism-level internal explanation
+&
+No
+&
+No
+&
+Explains internal anomaly mechanisms but not stock-date anomalies with external market evidence
+\\
+
+Hu et al.~\cite{hu2026}
+&
+Multimodal time-series anomaly detection
+&
+Time-text semantic alignment
+&
+Partial, but not finance-specific
+&
+No
+&
+Uses multimodal context but does not identify one grounded event explanation for a financial anomaly
+\\
+
+\c{C}alık et al.~\cite{calik2025}
+&
+Explainable stock forecasting
+&
+Prediction interpretability via SHAP/LIME
+&
+No
+&
+No
+&
+Focuses on prediction explanation rather than anomaly explanation with external evidence
+\\
+
+PatchTST~\cite{nie2023}
+&
+Transformer forecasting backbone
+&
+Signal-level forecasting model
+&
+No
+&
+No
+&
+Strong forecasting residual signal, but no grounded explanation pipeline
+\\
+
+TranAD~\cite{tuli2022}
+&
+Transformer anomaly detection backbone
+&
+Signal-level reconstruction model
+&
+No
+&
+No
+&
+Strong detection architecture, but no article-level grounding or structured robustness validation
+\\
+
+FinAnomX (this work)
+&
+Detect, explain, ground, and validate stock anomalies
+&
+Numeric attribution + evidence-grounded explanation
+&
+Yes
+&
+Yes
+&
+Integrated explanation workflow for analysts
+\\
+
+\end{longtable}
+\endgroup
+
+Table~\ref{tab:comparison_with_prior_works} shows that prior studies typically address only part of the problem, such as anomaly detection, interpretability, or multimodal alignment, whereas FinAnomX combines anomaly triggering, grounded explanation, and counterfactual validation in a single analyst-facing pipeline.
+
+\section{Proposed Methodology}
+
+\subsection{Problem Setting and System Overview}
+
+Given a detected stock-date anomaly peak, FinAnomX produces four analyst-facing outputs: an abnormality summary, principal numeric drivers, a top-ranked event explanation with grounding confidence, and a counterfactual robustness check.
+
+As illustrated in Figure~\ref{fig:pipeline}, the pipeline operates in five stages. It first constructs a market--macro feature space and generates anomaly scores by fusing forecasting-residual and reconstruction branches. Detected peaks then pass through a three-layer explainability module: numeric attribution identifies driving variables, event grounding links the anomaly to external evidence, and counterfactual validation stress-tests the explanation's stability before packaging these insights into analyst artifacts.
+
+\begin{figure}[!htbp]
+    \centering
+    \includegraphics[width=0.9\linewidth{fig_01_pipeline.pdf} 
+    \caption{End-to-end workflow of FinAnomX, from multimodal data preprocessing and anomaly scoring to explainability, event grounding, counterfactual validation, and analyst-facing outputs.}
+    \label{fig_01_pipeline.pdf}
+\end{figure}
+
+\subsection{Data Construction and Feature Preparation}
+
+FinAnomX integrates four data sources: daily market data from Yahoo Finance, macroeconomic series from FRED, event seed windows derived from SEC 8-K Item 2.02 filings and major macro-policy dates, and candidate news evidence retrieved from the GDELT Doc API. From these sources, the study constructs a market--macro feature space for anomaly scoring and downstream explanation. The final feature set includes return, momentum, volatility, volume, and macro-difference signals. Data are split chronologically to avoid temporal leakage, and detector inputs are scaled using a RobustScaler fit on the training split only, as visualized in Figure~\ref{fig:data_coverage_split_timeline}. Detailed dataset statistics and artifact counts are reported in Section~4.
+
+% Source marker: [ fig_02_data_coverage_split_timeline.png ]
+\begin{figure}[H]
+    \centering
+    \insertfigureorplaceholder{figures/fig_02_data_coverage_split_timeline.png}{Insert Figure 2 here.}
+    \caption{Data coverage and chronological split timeline.}
+    \label{fig:data_coverage_split_timeline}
+\end{figure}
+
+\subsection{Anomaly Detection Core}
+
+The detection core fuses two complementary branches: a PatchTST one-step forecaster (capturing deviations in log returns and volume via residuals) and a TranAD multivariate reconstructor (capturing joint temporal deviations across all 14 features). Branch scores are calibrated via train-only percentile normalization and fused with validation-tuned weights. Applying an adaptive past-only threshold groups timestamps into episodes, retaining the highest-scoring timestamp as the peak. Peaks are then sub-classified (e.g., price-dominant or mixed) based on shock and change-point evidence. In FinAnomX, detection serves as a trigger layer that surfaces candidate episodes for later explanation, grounding, and validation.
+
+\subsection{Explainability Layer: Numeric Attribution, Event Grounding, and Counterfactual Validation}
+
+The explainability layer comprises three components. First, numeric attribution identifies the feature groups and time regions driving each peak, a practice increasingly vital for financial model risk management \cite{giudici2021}. Branch-level attributions---computed via Integrated Gradients for PatchTST and occlusion-based sensitivity for TranAD---are fused and temporally aggregated to ensure faithfulness and stability. 
+
+Second, event grounding links peaks to plausible external evidence. Candidate articles from the GDELT Doc API (within a seven-day window) are enriched and ranked using a weighted function of semantic relevance, event consistency, and recency. The highest-ranked valid article serves as the top-1 grounded explanation. 
+
+Third, counterfactual validation is ``to test the robustness of the `selected' explanation'' by rerunning the scoring under structured query ablations \cite{vermeire2025}. These return a counterfactual strength score based on ranking stability and ranking consensus, thus providing a structured robustness check rather than a formal causal test. These three together answer what was abnormal, the event that most plausibly explains it, and whether that explanation is still held as such when challenged.
+
+\subsection{Artifact Packaging and Analyst-Facing Outputs}
+
+FinAnomX packages its outputs as precomputed artifacts rather than generating them through online retraining. Anomaly records, attribution summaries, grounded event evidence, and counterfactual outputs are exposed through a Streamlit dashboard that supports both cross-ticker overview and peak-level drill-down. The same artifacts are also used by a retrieval-augmented chatbot built on local LLM and embedding components.
+
+This artifact-first design improves reproducibility because both interfaces depend only on saved outputs from the offline pipeline. It also supports analyst-facing deployment by prioritizing transparency and traceability alongside anomaly detection.
+
+% =========================
+% 4. Experimental Setup
+% =========================
+\section{Experimental Setup}
+
+\paragraph{Dataset.}
+The experiments use a multimodal market--macro dataset covering AMZN, MSFT, NVDA, and TSLA. The raw panel spans 2018-02-01 to 2024-12-30 and contains 6,956 records. After removing indicator warm-up periods, the processed 14-feature panel contains 6,716 records. A strict chronological split assigns data through 2022-12-31 to training (4,712 records), 2023 to validation (1,000 records), and 2024 to test (1,004 records), while explanatory analysis is conducted over the combined 2023--2024 window. Beyond the model-ready panel, the pipeline produces auxiliary artifacts for explanation, including news candidates, grounded events, counterfactual outputs, and chat-ready records. Table~\ref{tab:dataset_artifact_summary} summarizes the dataset and artifact inventory used in the experimental setup.
+
+% Source marker: [ table_02_dataset_artifact_summary.csv ]
+\begin{table}[!htbp]
+    \centering
+    \scriptsize
+    \setlength{\tabcolsep}{4pt}
+    \renewcommand{\arraystretch}{1.15}
+    \begin{tabularx}{\linewidth}{p{2.6cm} p{2.3cm} p{1.2cm} p{3.2cm} Y}
+    \toprule
+    \textbf{Component} & \textbf{Scope / period} & \textbf{Records} & \textbf{Key fields / outputs} & \textbf{Experimental role} \\
+    \midrule
+    Raw market + macro panel & 4 tickers | 2018-02-01 to 2024-12-30 & 6,956 & OHLCV + VIX + DGS10 + FEDFUNDS + CPI & Input market--macro backbone used for anomaly screening. \\
+    Processed feature panel & 4 tickers | 2018-04-30 to 2024-12-30 & 6,716 & returns, RSI, MACD, rolling volatility, volume z-score, macro diffs & Engineered feature space fed into detectors and XAI. \\
+    News retrieval candidates (raw) & Peak-centered article search windows & 236 & article\_title, article\_summary, article\_text, domain, tone & Initial evidence pool before quality filtering. \\
+    Usable enriched news evidence & After content enrichment and filtering & 162 & full\_text / summary evidence, sentiment, embeddings & Article evidence actually eligible for grounding. \\
+    Episode peaks in analysis window & 2023-01-01 to 2024-12-31 & 25 & subtype, main\_score, abnormal summary & Peak anomalies used in the main analysis period. \\
+    Grounded peak cases in analysis window & 2023-01-01 to 2024-12-31 & 25 & top\_event\_title, confidence\_score, evidence\_text & Cases used for event attribution analysis. \\
+    Counterfactual evaluated peaks & Grounded peaks with query-ablation checks & 25 & cf\_strength, support\_level, top1\_changed & Used to test whether the proposed cause is robust. \\
+    Chat-ready artifacts & Packaged explanation records & 6,716 & numeric summary + event summary + full summary & Supports dashboard and grounded chatbot outputs. \\
+    \bottomrule
+    \end{tabularx}
+    \caption{Dataset and artifact summary.}
+    \label{tab:dataset_artifact_summary}
+\end{table}
+
+
+
+\paragraph{Models.}
+PatchTST is trained as a two-target next-step forecaster for log return and volume z-score, and TranAD is trained as a 14-feature multivariate reconstruction model. Chronos-2 is used as the external benchmark in a zero-shot setting with 13 covariates, context length 60, and prediction length 1. Additional baselines include IsolationForest, OC-SVM, PCA reconstruction, and DLinear-Ridge.
+
+\paragraph{Evaluation.}
+Point-wise ground truth is defined as:
+\begin{equation}
+\text{GT}_t = 1 \iff |\text{return z-score}|_t \geq 3.0 \;\text{or}\; \text{volume z-score}_t \geq 3.0
+\end{equation}
+where all z-scores are computed using train-only statistics. Change-point flags are excluded to avoid circular evaluation. Detection is evaluated with AUROC, AUPRC, precision, recall, F1, and precision@K.
+
+\paragraph{Implementation.}
+All experiments are run on an Intel Core i5-13400H CPU with seed 42 using PyTorch, scikit-learn, ruptures, Transformers, sentence-transformers, and Streamlit.
+
+% =========================
+% 5. Results and Discussion
+% =========================
+\section{Results and Discussion}
+
+\subsection{Detection Benchmark}
+
+Table~\ref{tab:detection_benchmark_snapshot} reports detection performance on the 2023–2024 analysis window under adaptive thresholding. Chronos-2 achieves the best AUPRC and F1 under the point-wise ground truth. TranAD outperforms the fusion model in AUROC and F1, while PatchTST is the weakest individual branch. The ground-truth positive rate in the analysis window is approximately 2.8\%.
+
+The performance gap partly reflects a mismatch between the evaluation protocol and the detector design. The ground truth emphasizes same-day return and volume shocks, whereas TranAD is sensitive to multi-day window-level abnormalities that may not align exactly with single-day labels. Accordingly, detector F1 should be interpreted as the quality of the trigger layer rather than the main criterion for the explanatory pipeline.
+
+% Source marker: [ table_03_detection_benchmark_snapshot.csv ]
+\begin{table}[!htbp]
+    \centering
+    \scriptsize
+    \setlength{\tabcolsep}{3pt}
+    \renewcommand{\arraystretch}{1.12}
+    \begin{adjustbox}{max width=\linewidth}
+    \begin{tabular}{p{4.2cm} p{4.2cm} c c c c c c c c}
+    \toprule
+    \textbf{Model} & \textbf{Role} & \textbf{AUROC} & \textbf{AUPRC} & \textbf{Precision} & \textbf{Recall} & \textbf{F1} & \textbf{P@5} & \textbf{P@10} & \textbf{P@20} \\
+    \midrule
+    Chronos-2 benchmark (adaptive) & Benchmark detector used for comparison & 0.7887 & 0.3899 & 0.2921 & 0.4643 & 0.3586 & 1.0000 & 0.9000 & 0.8000 \\
+    TranAD (adaptive) & Single-model deep detector baseline & 0.8178 & 0.0696 & 0.1206 & 0.4286 & 0.1882 & 0.0000 & 0.0000 & 0.0000 \\
+    PatchTST + TranAD (adaptive) & Operational main detector in the packaged pipeline & 0.7980 & 0.0624 & 0.1275 & 0.2321 & 0.1646 & 0.0000 & 0.0000 & 0.0000 \\
+    PatchTST (adaptive) & Single-model forecasting detector baseline & 0.5544 & 0.0308 & 0.0351 & 0.2321 & 0.0610 & 0.0000 & 0.0000 & 0.0000 \\
+    \bottomrule
+    \end{tabular}
+    \end{adjustbox}
+    \caption{Detection benchmark snapshot on the 2023--2024 analysis window.}
+    \label{tab:detection_benchmark_snapshot}
+\end{table}
+
+\subsection{Cross-Ticker Anomaly Overview}
+
+\begin{figure}[H]
+    \centering
+    \insertfigureorplaceholder{figures/fig_03_anomaly_overview_across_tickers.png}{Insert Figure 3 here.}
+    \caption{Anomaly overview across tickers in the 2023--2024 analysis window.}
+    \label{fig:anomaly_overview_across_tickers}
+\end{figure}
+
+In the 2023--2024 analysis window, the system identifies 25 episode peaks (Figure~\ref{fig:anomaly_overview_across_tickers}): TSLA 12, NVDA 7, MSFT 4, and AMZN 2.
+
+Greater peak counts for TSLA and NVDA are consistent with their larger price swings, stronger sensitivity to earnings revisions, and higher exposure to macro-driven repricing during the period.
+
+As shown in Figure~\ref{fig:subtype_distribution}, the subtype distribution is dominated by other, followed by volume-burst and mixed, indicating that most detected anomalies are multi-dimensional rather than isolated one-axis shocks.
+
+% Source marker: [ fig_03_anomaly_overview_across_tickers.png ]
+
+% Source marker: [ fig_04_subtype_distribution.png ]
+\begin{figure}[H]
+    \centering
+    \includegraphics[scale=0.5]{figures/fig_04_subtype_distribution.png}
+    \caption{Distribution of anomaly subtypes.}
+    \label{fig:subtype_distribution}
+\end{figure}
+
+\subsection{Explainability Results: Attribution, Grounding, and Counterfactual Robustness}
+
+
+% Source marker: [ table_04_explanation_grounding_counterfactual_summary.csv ]
+\begin{table}[H]
+    \centering
+    \scriptsize
+    \setlength{\tabcolsep}{4pt}
+    \renewcommand{\arraystretch}{1.12}
+    \begin{tabularx}{\linewidth}{p{4.2cm} p{1.4cm} Y}
+    \toprule
+    \textbf{Metric} & \textbf{Value} & \textbf{Interpretation} \\
+    \midrule
+    Faithfulness pass rate & 1.0000 & Checks whether removing important features actually lowers the anomaly score. \\
+    Mean absolute score drop after feature deletion & 0.2218 & Higher drop supports that the explanation is not decorative. \\
+    Mean overlap@5 under date jitter & 0.6286 & Measures whether top features stay similar under small date perturbations. \\
+    Mean Spearman correlation of feature ranks & 0.5865 & Measures rank consistency of explanations. \\
+    Mean confidence of all ranked event candidates & 0.6891 & Average quality of ranked news candidates before top-1 selection. \\
+    Mean confidence of top-1 grounded event & 0.7948 & Quality of the final proposed cause. \\
+    Top-1 share using full-text or summary evidence & 1.0000 & Ensures top-1 evidence is not title-only. \\
+    Top-1 share using full-text evidence & 0.8400 & Shows how often the final cause is backed by full article text. \\
+    Top-1 event cluster consensus & 0.9093 & Higher means the proposed event is supported by a coherent article cluster. \\
+    Mean counterfactual strength & 0.8032 & Higher means the proposed cause remains robust under robustness checks. \\
+    Share of peaks whose top-1 changes under ablation & 0.2400 & Lower is better; too much change would indicate fragile grounding. \\
+    Share of peaks with strong counterfactual support & 0.8400 & Direct summary of grounded causes that remain convincing after ablation. \\
+    Grounded peak cases in analysis window & 25 & Peak anomalies in the main analysis window that received a ranked top-1 event explanation. \\
+    Counterfactual evaluated peaks & 25 & Grounded peaks that also received rebuttal-style robustness checks. \\
+    \bottomrule
+    \end{tabularx}
+    \caption{Explanation, grounding, and counterfactual summary.}
+    \label{tab:explanation_grounding_counterfactual_summary}
+\end{table}
+
+
+Explanation and grounding performance is summarized in Table~\ref{tab:explanation_grounding_counterfactual_summary}. The faithfulness pass rate is 1.0000, and the mean anomaly score drop after removing top-ranked features is 0.2218, indicating that the attribution layer captures functionally relevant features. Under small date perturbations, overlap@5 is 0.6286 and the mean Spearman rank correlation is 0.5865.
+
+Event grounding provides the main empirical contribution of the system. The mean top-1 grounding confidence is 0.7948, compared with 0.6891 across all candidates, indicating that the ranking function prioritizes stronger evidence. In all 25 top-1 explanations, full-text or summary evidence was used, with 21 cases (84\%) grounded in the full article text. Mean event-cluster consensus is 0.9093, suggesting that selected explanations are reinforced by coherent article groups.
+
+Counterfactual evaluation further supports robustness. Mean counterfactual strength is 0.8032, the top-1 explanation changes under at least one ablation in 6 of 25 cases (24%), and 21 peaks (84\%) receive strong counterfactual support.
+
+% Source marker: [ fig_05_feature_attribution_composition.png ]
+\begin{figure}[!htbp]
+    \centering
+    \begin{minipage}{0.97\linewidth}
+        \centering
+        \insertfigureorplaceholder{figures/fig_05_feature_attribution_composition.png}{Insert Figure 5 here.}
+    \end{minipage}
+    \caption{Feature attribution composition across semantic signal groups.}
+    \label{fig:feature_attribution_composition}
+\end{figure}
+
+
+% Source marker: [ fig_05b_xai_peak_feature_heatmap.png ]
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\linewidth,height=0.6\textheight,keepaspectratio]{figures/fig_05b_xai_peak_feature_heatmap.png}
+    \caption{Peak-level XAI feature heatmap.}
+    \label{fig:xai_peak_feature_heatmap}
+\end{figure}
+
+Figure~\ref{fig:feature_attribution_composition} shows aggregate dominance patterns across semantic signal groups, while the peak-level heatmap (Figure~\ref{fig:xai_peak_feature_heatmap}) highlights substantial episode heterogeneity. Some peaks are primarily technical, others are macro-sensitive, and others are dominated by price or volume signals, confirming that the explanatory profile is episode-specific rather than uniform across tickers.
+
+\subsection{Representative Grounded Cases}
+
+Table~\ref{tab:representative_grounded_case_studies} presents eight representative grounded cases across the four tickers. The examples illustrate the diversity of anomaly narratives captured by the system. AMZN on 2023-10-27 is a volume-burst episode grounded to Q3 2023 earnings that exceeded EPS and revenue expectations (confidence 0.886, strong counterfactual support). NVDA on 2024-04-19 is a mixed four-day episode linked to semiconductor ETF volatility evidence (confidence 0.862, strong support). TSLA on 2024-11-06 is explained by post-election optimism toward Tesla (confidence 0.903, strong support). These cases show that the pipeline can ground firm-specific, sectoral, and macro-driven anomalies using a common retrieval and validation procedure.
+
+% Source marker: [ table_05_representative_grounded_case_studies.csv ]
+\begin{table}[H]
+    \centering
+    \scriptsize
+    \setlength{\tabcolsep}{2.5pt}
+    \renewcommand{\arraystretch}{1.1}
+    \begin{adjustbox}{max width=\linewidth}
+    \begin{tabular}{c c c p{3.0cm} p{1.8cm} p{5.0cm} c c c c}
+    \toprule
+    \textbf{Ticker} & \textbf{Peak date} & \textbf{Subtype} & \textbf{Abnormality summary} & \textbf{Top numeric driver} & \textbf{Top grounded event} & \textbf{Source} & \textbf{Conf.} & \textbf{CF support} & \textbf{CF str.} \\
+    \midrule
+    AMZN & 2023-10-27 & volume-burst & Volume burst: volume z-score 3.22 with 1-day return +6.83\%. & daily return & Amazon (AMZN) Q3 2023 earnings results beat EPS \& revenue estimates & full\_text & 0.886 & strong & 0.819 \\
+    AMZN & 2024-08-02 & mixed & Unusual episode lasting 3 day(s), 1-day return -8.78\% and volume z-score 3.93. & daily return & Amazon.com (AMZN) Rose on Growing Optimism & full\_text & 0.618 & moderate & 0.743 \\
+    MSFT & 2024-04-25 & volume-burst & Volume burst: volume z-score 3.40 with 1-day return -2.45\%. & abnormal volume & Microsoft (MSFT) Continues to Grow Impressively & full\_text & 0.841 & strong & 0.765 \\
+    MSFT & 2024-08-05 & other & Unusual episode lasting 3 day(s), 1-day return -3.27\% and volume z-score 2.01. & VIX change & Stock Market Falls As Bears Bash Techs; S\&P 500 Tests Key Level Ahead Of Fed & full\_text & 0.927 & strong & 0.895 \\
+    NVDA & 2024-04-19 & mixed & Unusual episode lasting 4 day(s), 1-day return -10.00\% and volume z-score 3.36. & MACD spread & Nvidia ETFs Take Center Stage As Bears, Bulls Duke It Out With 8\%-14\% Swings (NVDA, SOXS, NVDL, ... ) & full\_text & 0.862 & strong & 0.898 \\
+    NVDA & 2024-10-15 & other & Unusual episode lasting 2 day(s), 1-day return -4.69\% and volume z-score 1.73. & MACD spread & Nvidia Stock: Blackwell AI Processors On Schedule | Investor Business Daily & full\_text & 0.889 & strong & 0.894 \\
+    TSLA & 2023-02-01 & other & Unusual episode lasting 1 day(s), 1-day return +4.73\% and volume z-score 0.55. & CPI change & Tesla Stock Forecast: TSLA blasts through \$154 resistance, \$167.50 next up & full\_text & 0.908 & strong & 0.921 \\
+    TSLA & 2024-11-06 & other & Unusual episode lasting 1 day(s), 1-day return +14.75\% and volume z-score 1.71. & daily return & Should You Buy Tesla Stock After Trump Election Win? & full\_text & 0.903 & strong & 0.863 \\
+    \bottomrule
+    \end{tabular}
+    \end{adjustbox}
+    \caption{Representative grounded case studies.}
+    \label{tab:representative_grounded_case_studies}
+\end{table}
+
+\subsection{Detailed Grounded Case Study}
+
+The detailed case study, illustrated in Figure~\ref{fig:detailed_grounded_case_study}, focuses on MSFT at the detected peak on 2024-08-05. The episode is characterized by a one-day return of $-3.27\%$, a volume z-score of 2.01, and a three-day anomaly span. The top linked event, ``Stock Market Falls As Bears Bash Techs; S\&P 500 Tests Key Level Ahead Of Fed,'' is retrieved as full-text evidence with grounding confidence 0.927. VIX change is the strongest numeric driver, followed by MACD spread, MACD momentum, RSI momentum, and 5-day volatility, indicating a macro-driven rather than purely firm-specific anomaly. Related article themes include EARNINGS, FOMC, PRODUCT\_AI, and MACRO. Counterfactual validation also supports the explanation, with counterfactual strength 0.895, stability 0.887, specificity 0.789, and ambiguity risk 0.205.
+
+% Source marker: [ fig_08_detailed_grounded_case_study.png ]
+\begin{figure}[H]
+    \centering
+    \insertfigureorplaceholder{figures/fig_08_detailed_grounded_case_study.png}{Insert Figure 8 here.}
+    \caption{Detailed grounded case study for MSFT on 2024-08-05.}
+    \label{fig:detailed_grounded_case_study}
+\end{figure}
+
+
+% =========================
+% 6. Conclusion
+% =========================
+\section{Conclusion}
+
+FinAnomX contributes an offline-first, analyst-facing explanation pipeline rather than a standalone anomaly detector. The system unifies anomaly triggering, numeric attribution, evidence-grounded event retrieval, and counterfactual robustness testing into a reproducible artifact-based workflow for financial anomaly analysis. Across the 2023–2024 analysis window, the system identifies 25 episode peaks over AMZN, MSFT, NVDA, and TSLA, and all 25 receive a ranked top-1 grounded event explanation. The explanation layer achieves a faithfulness pass rate of 1.0000, mean top-1 grounding confidence of 0.7948, full-text evidence coverage in 84\% of cases, mean counterfactual strength of 0.8032, and strong counterfactual support in 84\% of grounded peaks.
+
+These results suggest that the main contribution of FinAnomX lies not in maximizing point-wise detection scores alone, but in converting anomaly signals into transparent and auditable analyst-facing explanations. At the same time, the current study also exposes a key limitation: the PatchTST branch remains weak under the present point-wise evaluation protocol, which is only partially aligned with the multi-day episode detection objective. Future work should therefore improve detector-label alignment, strengthen the forecasting-residual branch with richer target variables, and develop event-aware evaluation criteria that better reflect episode-level detection and near-miss explanatory usefulness.
+
+% =========================
+\clearpage
+
+% References
+% =========================
+\begingroup
+\setlength{\parskip}{0pt}
+
+\begin{thebibliography}{99}
+\setlength{\itemsep}{0pt}
+
+\bibitem{li2025}
+Z. Li and R. Fan,
+``Explainable heterogeneous anomaly detection in financial networks via adaptive expert routing,''
+in \emph{XAI-FIN, ACM ICAIF}, 2025.
+
+\bibitem{hu2026}
+S. Hu et al.,
+``Towards multimodal time series anomaly detection with semantic alignment and condensed interaction,''
+in \emph{ICLR}, 2026.
+
+\bibitem{calik2025}
+S.~S. Calik et al.,
+``Explainable-AI powered stock price prediction using time series transformers: A case study on BIST100,''
+\emph{arXiv preprint arXiv:2506.06345}, 2025.
+
+\bibitem{nie2023}
+Y. Nie et al.,
+``A time series is worth 64 words: Long-term forecasting with transformers,''
+in \emph{ICLR}, 2023.
+
+\bibitem{tuli2022}
+S. Tuli et al.,
+``TranAD: Deep transformer networks for anomaly detection in multivariate time series,''
+\emph{Proc. VLDB Endow.}, 2022.
+
+\bibitem{zeng2023}
+A. Zeng et al.,
+``Are transformers effective for time series forecasting?''
+in \emph{AAAI}, 2023.
+
+\bibitem{liu2024}
+Y. Liu et al.,
+``iTransformer: Inverted transformers are effective for time series forecasting,''
+in \emph{ICLR}, 2024.
+
+\bibitem{arrieta2020}
+A.~B. Arrieta et al.,
+``Explainable artificial intelligence (XAI): Concepts, taxonomies, opportunities and challenges,''
+\emph{Information Fusion}, 2020.
+
+\bibitem{verma2020}
+S. Verma et al.,
+``Counterfactual explanations for machine learning: A review,''
+\emph{arXiv:2010.10596}, 2020.
+
+\bibitem{wachter2017}
+S. Wachter et al.,
+``Counterfactual explanations without opening the black box,''
+\emph{Harvard Journal of Law \& Technology}, 2017.
+
+\bibitem{giudici2021}
+P. Giudici and E. Raffinetti,
+``A Shapley value-based approach to measure financial model risk,''
+\emph{Expert Systems with Applications}, 2021.
+
+\bibitem{vermeire2025}
+T. Vermeire et al.,
+``AR-Pro: Counterfactual explanations for anomaly repair with formal properties,''
+\emph{arXiv:2501.09876}, 2025.
+
+% Keep key xing2025 to preserve existing \cite{xing2025}
+\bibitem{xing2025}
+Y. Jiang et al.,
+``Multi-modal time series analysis: A tutorial and survey,''
+in \emph{KDD}, 2025, pp. 6043--6053, doi: 10.1145/3711896.3736567.
+
+% Keep key zhang2025 to preserve existing \cite{zhang2025}
+\bibitem{zhang2025}
+W. Xu et al.,
+``FinMultiTime: A four-modal bilingual dataset for financial time-series analysis,''
+\emph{arXiv preprint arXiv:2506.05019}, 2025.
+
+\bibitem{siahmaki2023}
+M. Siahmaki et al.,
+``Using transformer models for stock market anomaly detection,''
+\emph{Journal of Data Science}, 2023.
+
+\bibitem{bhattacharyya2024}
+S. Bhattacharyya et al.,
+``Transaction anomaly detection using explainable AI,''
+\emph{JETIR}, 2024.
+
+\bibitem{luo2025}
+Y. Luo et al.,
+``Explainable AI (XAI) in financial decision-making systems,''
+\emph{ResearchGate}, 2025.
+
+\bibitem{jin2025}
+J. Jin et al.,
+``Explainable AI (XAI) in financial fraud detection systems,''
+\emph{Journal of Financial Technology}, 2025.
+
+\end{thebibliography}
+\endgroup
+
+\end{document}

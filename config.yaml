@@ -1,0 +1,58 @@
+# config.yaml - Central configuration for Solar PV Fault Diagnosis Project
+
+plant_settings:
+  plant1_id: 4135001
+  plant2_id: 4136001
+  dc_correction_factor: 10.0
+  interval_hours: 0.25  # 15 minutes = 0.25 hour
+  irradiation_day_threshold: 0.0
+
+carbon_settings:
+  emission_factor: 0.703  # kgCO2/kWh (CEA FY2020-21, Indian Grid)
+
+taxonomy_thresholds:
+  irr_threshold: 0.2
+  partial_loss_ratio: 0.5
+  thermal_temp_threshold: 50.0
+  thermal_eff_threshold: 0.85
+
+baseline_hyperparameters:
+  isolation_forest:
+    n_estimators: 500
+    max_samples: 'auto'
+    contamination: 0.03 # UNUSED — contamination has no effect on score_samples(); excluded from tuning per A6 finding, see main.tex Section 5.3
+    random_state: 42
+  one_class_svm:
+    nu: 0.02
+    kernel: 'rbf'
+    gamma: 'scale'
+  lof:
+    n_neighbors: 10
+    contamination: 0.05 # UNUSED — contamination has no effect on score_samples(); excluded from tuning per A6 finding, see main.tex Section 5.3
+    novelty: true
+
+model_hyperparameters:
+  xgboost:
+    n_estimators: 300
+    max_depth: 6
+    learning_rate: 0.1
+    subsample: 0.8
+    colsample_bytree: 0.8
+    random_state: 42
+
+features:
+  regression:
+    - IRRADIATION
+    - AMBIENT_TEMPERATURE
+    - MODULE_TEMPERATURE
+    - HOUR_SIN
+    - HOUR_COS
+  anomaly_detection:
+    - AC_POWER
+    - DC_POWER_CORRECTED
+    - IRRADIATION
+    - MODULE_TEMPERATURE
+    - AMBIENT_TEMPERATURE
+    - EFFICIENCY_CORRECTED
+    - PEER_AVG_AC_POWER
+    - POWER_GAP_PERCENT
