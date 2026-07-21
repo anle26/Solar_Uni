@@ -49,5 +49,3 @@ The pipeline is fully automated via `reproduce_all.py`, executing the following 
 6. **Baselines & Evaluation**: Injecting synthetic faults and evaluating unsupervised ML baselines (IF, OCSVM, LOF) against the rule-based taxonomy (`src/baselines.py`, `src/fault_injection.py`).
 7. **Figure Generation**: Producing all deterministic figures and visualizations for the final report/paper (`figures/generate_all_figures.py`).
 
-## Dashboard
-The main Power BI dashboard is located at `power_bi/dashboard.pbix`. It connects directly to the `.csv` files generated inside `data/processed/` after running the pipeline.
