@@ -46,3 +46,13 @@ notebooks/paper/05_paper_anomaly_baselines.py
 docs/audit_and_cleanup_brief.md
 docs/Edit/Paper_Arguments_and_Insights.md
 docs/PHASE03_LATEX_GUIDE.md
+
+# Local Streamlit credentials (never commit API keys)
+.streamlit/secrets.toml
+
+# Local Claude Code dev-tooling config (not part of the app)
+.claude/
+
+# Local uv runtime/cache used for dashboard verification
+.uv-cache/
+.uv-python/
