@@ -230,7 +230,6 @@ def plot_pr_curves():
 
     ax.set_xlabel('Recall')
     ax.set_ylabel('Precision')
-    ax.set_title('Fig. 6 — Precision–Recall Curves\n(UML: Illustrative Seed 11; Rule-Based: Aggregate N=20)')
     ax.set_xlim([0, 1])
     ax.set_ylim([0, 1.05])
     ax.legend(loc='upper right', framealpha=0.9)
@@ -289,14 +288,6 @@ def plot_baseline_comparison():
     ax.set_ylabel('Score')
     ax.set_ylim([0, 1.15])
 
-    # Hyperparameter annotation
-    ne  = params.get('iforest_n_estimators', 500)
-    nu  = params.get('ocsvm_nu', 0.02)
-    nn  = params.get('lof_n_neighbors', 10)
-    note = (f'IF: n_estimators={ne}, max_samples=auto  |  '
-            f'OCSVM: ν={nu}  |  LOF: k={nn}  |  '
-            f'N=20 test seeds (11–30)')
-    ax.set_title(f'Fig. 8 — Baseline Comparison (Mean ± Std)\n{note}', fontsize=8)
     ax.legend(loc='upper right', framealpha=0.9)
     ax.grid(axis='y', alpha=0.3)
 

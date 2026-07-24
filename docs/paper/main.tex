@@ -39,7 +39,7 @@
 \pagestyle{fancy}
 \fancyhf{}
 \fancyhead[RO]{\small Solar PV Fault Diagnosis\hspace{1em}\thepage}
-\fancyhead[LE]{\small\thepage\hspace{1em}Author Name et al.}
+\fancyhead[LE]{\small\thepage\hspace{1em}Nguyen et al.}
 \fancyfoot{}
 \renewcommand{\headrulewidth}{0pt}
 \renewcommand{\footrulewidth}{0pt}
@@ -47,7 +47,7 @@
 \fancypagestyle{plain}{
     \fancyhf{}
     \fancyhead[RO]{\small Solar PV Fault Diagnosis\hspace{1em}\thepage}
-    \fancyhead[LE]{\small\thepage\hspace{1em}[INSERT AUTHOR NAMES]}
+    \fancyhead[LE]{\small\thepage\hspace{1em}Nguyen et al.}
     \fancyfoot{}
     \renewcommand{\headrulewidth}{0pt}
     \renewcommand{\footrulewidth}{0pt}
@@ -56,9 +56,18 @@
 % =========================
 % Title
 % =========================
-\title{\textbf{An Explainable, Data Efficient Framework for Multi Class Fault Diagnosis and Carbon Loss Quantification in Early Stage Solar PV Monitoring}}
+\title{\textbf{An Explainable, Data-Efficient Framework for Multi-Class Fault Diagnosis and Carbon Loss Quantification in Solar PV Monitoring}}
 
-\author{[INSERT AUTHOR NAMES] \\ [INSERT AFFILIATION]}
+\author{%
+\begin{tabular}{c}
+Linh Hoang Nguyen\textsuperscript{1},
+Tien Dong Dinh\textsuperscript{1,*},
+An Dang Thai Le\textsuperscript{1},
+Phuc Nguyen Huu Do\textsuperscript{1} \\[0.35em]
+\textsuperscript{1}FPT University, Ho Chi Minh Campus, Vietnam \\[0.25em]
+\small \texttt{LinhNH67@fe.edu.vn}; \texttt{tienddse200934@fpt.edu.vn}; \texttt{anldtse200518@fpt.edu.vn}; \texttt{do.huuphuc2k5@gmail.com} \\[0.20em]
+\end{tabular}%
+}
 \date{}
 
 \begin{document}
@@ -70,7 +79,7 @@
 % Abstract
 % =========================
 \begin{abstract}
-Solar photovoltaic plants often suffer from an early stage monitoring cold start problem, where limited historical data prevents the effective deployment of traditional data hungry anomaly detection models. Furthermore, existing approaches often frame fault diagnosis as a binary problem, ignoring the specific operational and maintenance actions required. This paper proposes an explainable, data efficient framework for multi class fault diagnosis and carbon loss quantification designed specifically for early stage monitoring, validated on just 34 days of data. By leveraging a single global Expected Power Model based on Extreme Gradient Boosting combined with a physics informed rule based taxonomy, our framework overcomes the anomaly masking problem prevalent in local model architectures. We introduce a Masked Loss Aggregation technique to eliminate Positive Drift Bias in energy loss quantification, allowing for accurate mapping of faults to carbon emission losses. Extensive evaluation through physics informed synthetic fault injection demonstrates that our approach achieves an F1 score of 0.74 $\pm$ 0.05 with perfect precision (1.00 $\pm$ 0.00), significantly outperforming unsupervised machine learning baselines which suffer from severe alert fatigue. Ultimately, the framework identified over 639 MWh of recoverable energy loss, translating to nearly 450 metric tons of avoided CO2 emissions.
+Solar photovoltaic (PV) monitoring faces a fundamental tension: the per-inverter local models that achieve the highest forecasting accuracy inadvertently mask the very faults they should reveal, learning the degraded state of an underperforming inverter as its new normal. Moreover, existing approaches often frame fault diagnosis as a binary problem, ignoring the specific operational and maintenance (O\&M) actions required. This paper proposes an explainable, data-efficient framework for multi-class fault diagnosis and carbon loss quantification that inverts the conventional design objective: rather than fitting each inverter as closely as possible, we train a single global Expected Power Model, using Extreme Gradient Boosting, whose deviations expose degraded assets against an ideal plant-wide baseline. Combined with a physics-informed rule-based taxonomy, this design overcomes the anomaly-masking problem inherent to local architectures. We further introduce a Masked Loss Aggregation technique to eliminate Positive Drift Bias in energy loss quantification, enabling faults to be mapped to carbon-emission losses. Evaluated through physics-informed synthetic fault injection on a short (34-day) public benchmark, the framework achieves an F1 score of 0.74 $\pm$ 0.05, and identifies over 639 MWh of recoverable energy loss corresponding to nearly 450 metric tons of avoided CO\textsubscript{2}. The workflow demonstrates that practical inverter-level performance monitoring can be established from short-term operational data alone, without the multi-month or multi-year records required by many long-term degradation studies.
 \end{abstract}
 
 \noindent\textbf{Keywords:} Solar Photovoltaic, Fault Diagnosis, XGBoost, Anomaly Detection, Carbon Footprint, SHAP.
@@ -84,20 +93,16 @@ Solar photovoltaic plants often suffer from an early stage monitoring cold start
 % =========================
 \section{Introduction}
 
-As solar Photovoltaic (PV) generation capacity expands globally, effective Operations and Maintenance (O\&M) has become critical to maximizing energy yield and offsetting carbon emissions. Many newly commissioned utility scale PV plants face a cold start problem. Advanced predictive maintenance systems typically require months or years of historical data to establish reliable baselines, leaving plants vulnerable during their critical early operation phases.
+Machine learning has been widely applied to PV power forecasting, where the objective is to predict generation as accurately as possible. Achieving this typically favors per-inverter local models that fit each unit's historical behavior closely; for instance, Nahar et al.~\cite{nahar2025} report high forecasting accuracy by training an individual model for every inverter. However, an objective that is ideal for forecasting is counterproductive for fault diagnosis. A model that fits a chronically underperforming inverter closely will learn its degraded output as the expected norm, producing near-zero residuals despite real power loss. We formally define this phenomenon as \textit{anomaly masking}: when an underperforming asset's historical data $X_{\text{local}}$ trains a model $f(X_{\text{local}})$ that normalizes the fault signature, yielding $y - f(X_{\text{local}}) \approx 0$ despite actual degradation. Traditional anomaly detection compounds this by framing diagnosis as a binary normal-versus-anomalous decision, providing limited utility to operations and maintenance (O\&M) teams who require actionable, multi-class categorizations to dispatch crews effectively.
 
-Traditional anomaly detection often frames fault diagnosis as a binary classification problem between normal and anomalous states. This provides limited utility to O\&M teams, who require actionable, multi class categorizations, such as total failure versus partial degradation, to dispatch crews effectively. Existing Unsupervised Machine Learning (UML) models such as Isolation Forest (IF) or Local Outlier Factor (LOF) frequently suffer from alert fatigue, generating excessive false positive alarms due to normal weather fluctuations.
-
-To address these challenges, this paper proposes an explainable, data efficient framework for PV fault diagnosis and carbon loss quantification, validated on a real world dataset comprising merely 34 days of operation. The framework effectively operates with only 34 days of data, eliminating the need for long term historical records. A rule based classification system maps faults to specific O\&M actions, moving beyond binary anomaly detection. A rigorous synthetic fault injection methodology preserves physical relationships, ensuring fair evaluation between rule based and UML models. A novel Masked Loss Aggregation technique links fault detection directly to energy and CO2 loss, while effectively eliminating positive drift bias.
+This paper is built on a single observation: the design criterion for an expected-power model should be inverted when the goal shifts from forecasting to fault diagnosis. Rather than minimizing per-inverter error, we deliberately train one global Expected Power Model across an entire plant, so that a degraded inverter is measured against an ideal plant-wide baseline rather than against its own compromised history. The resulting deviations, which reduce forecasting accuracy on degraded plants, are precisely the signal that fault diagnosis requires. Building on this principle, our contributions are: (i) a global expected-power modeling approach that structurally avoids anomaly masking; (ii) a physics-informed, rule-based taxonomy that maps deviations to multi-class, action-oriented fault categories; (iii) a Masked Loss Aggregation technique that eliminates Positive Drift Bias when converting detected faults into energy and carbon-emission losses; and (iv) a demonstration that this workflow operates on short-term operational data alone. Using a 34-day public benchmark, we show that practical inverter-level performance monitoring can be established without the multi-month or multi-year records required by many long-term degradation studies, though we note this necessarily precludes the study of long-horizon phenomena such as seasonal effects and soiling cycles.
 
 % =========================
 % 2. Related Work
 % =========================
-\section{Related Work}
+Recent studies have increasingly applied Machine Learning to PV forecasting and anomaly detection. Unsupervised Machine Learning (UML) approaches such as One-Class SVM~\cite{scholkopf2001} and Local Outlier Factor~\cite{breunig2000} are widely applied to anomaly detection in PV systems~\cite{mellit2022}. However, as our evaluation in Section~\ref{sec:synthetic_eval} demonstrates, such methods do not incorporate the physical constraints of the DC-to-AC conversion process, and consequently exhibit high false-positive rates when assessed on physically consistent fault data. Other studies emphasize Explainable Artificial Intelligence \cite{arrieta2020} using Extreme Gradient Boosting (XGBoost) \cite{chen2016} and SHapley Additive exPlanations (SHAP) \cite{lundberg2017} for interpretability, but they rarely combine this with a multi-class taxonomy mapped to actionable O\&M thresholds.
 
-Recent studies have increasingly applied Machine Learning to PV forecasting and anomaly detection. For instance, Nahar et al. \cite{nahar2025} achieved exceptionally high accuracy in expected power generation by training individual, localized models for every single inverter in a plant. While accurate for forecasting normal behavior, such localized architectures inadvertently introduce anomaly masking. By learning the specific degraded state of an underperforming inverter as its new normal, local models systematically fail to flag partial power losses. We formally define this phenomenon as \textit{anomaly masking}, where an underperforming asset's historical data $X_{\text{local}}$ is used to train a model $f(X_{\text{local}})$ that effectively normalizes the fault signature, resulting in near-zero residuals $y - f(X_{\text{local}}) \approx 0$ despite actual degradation.
-
-In contrast to localized approaches, our framework utilizes a global model architecture. While this yields a statistically lower accuracy on highly degraded plants, this variance is mathematically necessary to expose underperforming assets against an ideal, plant wide baseline. Furthermore, while UML approaches like One-Class SVM and LOF are popular for detecting out of distribution events in PV systems \cite{ahmed2020}, they often fail to account for the physical constraints of the DC to AC conversion process, leading to a high rate of false positive alarms when evaluated under stringent, physically sound conditions \cite{zhao2021}. Other studies emphasize Explainable Artificial Intelligence \cite{arrieta2020} using Extreme Gradient Boosting (XGBoost) \cite{chen2016} and SHapley Additive exPlanations (SHAP) \cite{lundberg2017} for interpretability, but they rarely combine this with a multi class taxonomy mapped to actionable O\&M thresholds.
+Advanced deep learning and machine learning techniques have also been explored for PV fault diagnosis and time-series anomaly detection. For instance, Chen et al.~\cite{chenz2019} proposed a deep residual network operating on I-V curves for array-level fault diagnosis, while Voutsinas et al.~\cite{voutsinas2023} developed ML-based methods for early fault detection. For multivariate time-series anomaly detection broadly, transformer-based architectures such as TranAD~\cite{tuli2022} have achieved state-of-the-art detection performance. On the exact benchmark dataset evaluated in this work, Siddiqa et al.~\cite{siddiqa2025} recently introduced a two-stage transformer framework (SolarTrans) to forecast power generation. However, while these advanced architectures prioritize raw predictive or anomaly detection accuracy, they generally do not provide an action-oriented multi-class taxonomy mapped to specific O\&M dispatch procedures, nor do they quantify energy and carbon loss—critical operational capabilities provided by our proposed framework.
 
 % =========================
 % 3. Methodology
@@ -105,13 +110,32 @@ In contrast to localized approaches, our framework utilizes a global model archi
 \section{Methodology}
 
 \subsection{Data and Preprocessing}
-A critical aspect of PV data preprocessing involves handling zero power intervals. Many pipelines routinely drop instances where DC power is zero to avoid division by zero errors when calculating conversion efficiency. However, in fault detection, zero power is not noise; it is the most vital signal indicating a catastrophic total failure event. Our framework explicitly preserves these records, encoding undefined efficiencies to 0.0 to guarantee complete retention of severe failure events.
+Zero-power intervals pose a choice in preprocessing: discarding them avoids division-by-zero when computing conversion efficiency, but in fault detection a zero-power reading under daylight is the most informative signal of total failure. We therefore retain these records and encode undefined efficiency as 0.0.
 
 \subsection{Expected Power Model}
 We train an XGBoost \cite{chen2016} regression model to predict the expected AC power output. Crucially, we proactively exclude DC power from the feature set. Including DC power causes target leakage, where the model would merely learn the conversion efficiency rather than the actual impact of environmental variables such as irradiance and temperature. Relying solely on meteorological features ensures the model predicts the ideal power generation, allowing upstream faults to reflect as actionable power losses. Our single global model establishes a plant wide performance baseline, avoiding the anomaly masking inherent to inverter specific local models.
 
-\subsection{Rule Based Taxonomy}
-We implement a multi class taxonomy designed around actionable O\&M thresholds. The taxonomy identifies categories such as total loss, requiring immediate crew dispatch, and partial loss, requiring inspection within 24 hours. We iteratively refined the taxonomy by removing physically flawed rules; for instance, inverter clipping was removed as its traditional definition contradicted the physical reality of inverter saturation.
+\subsection{Rule-Based Taxonomy}
+We implement a multi-class taxonomy designed around actionable O\&M thresholds. The taxonomy identifies categories such as total loss, requiring immediate crew dispatch, and partial loss, requiring inspection within 24 hours. We iteratively refined the taxonomy by removing physically flawed rules; for instance, inverter clipping was removed as its traditional definition contradicted the physical reality of inverter saturation. Table~\ref{tab:taxonomy_thresholds} details the specific detection conditions and corresponding O\&M actions for each class.
+
+\begin{table}[H]
+\centering
+\caption{Rule-Based Fault Taxonomy: Detection Thresholds and O\&M Actions}
+\label{tab:taxonomy_thresholds}
+\begin{tabular}{lll}
+\toprule
+\textbf{Class} & \textbf{Detection Condition} & \textbf{O\&M Action} \\
+\midrule
+TOTAL\_LOSS & $P_{AC}=0$ and $G>0.2$ & Immediate dispatch \\
+PARTIAL\_LOSS & $0 < P_{AC} < 0.5\,\bar{P}_{\text{peer}}$ and $G>0.2$ & Inspect within 24h \\
+NORMAL & otherwise & None \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent where $P_{AC}$ is the measured AC power, $G$ is irradiance (kW/m\textsuperscript{2}), and $\bar{P}_{\text{peer}}$ is the mean AC power of co-located inverters at the same timestamp.
+
+Two design points warrant explanation. First, the PARTIAL\_LOSS rule compares an inverter against the contemporaneous mean of its co-located peers ($\bar{P}_{\text{peer}}$), a relative criterion that complements the absolute plant-wide baseline provided by the global Expected Power Model; the two operate at different granularities and serve as independent corroborating signals rather than a single global comparison. Second, we acknowledge that the TOTAL\_LOSS condition ($P_{AC}=0$ under non-trivial irradiance) closely parallels the mechanism by which total-loss faults are synthetically injected in our evaluation. This overlap is the source of the perfect precision reported in Section~\ref{sec:synthetic_eval} and is discussed as a limitation in Section~\ref{sec:limitations}; the thresholds themselves are grounded in physical operating logic (an inverter producing zero power under sunlight is unambiguously faulted) rather than tuned to the injection procedure.
 
 \subsection{Masked Loss Aggregation}
 Quantifying energy loss typically involves a Rectified Linear Unit function taking the maximum of the difference between expected and actual power and zero. However, applying this continuously over time accumulates normal predictive variance into massive phantom losses, a phenomenon we term \textit{positive drift bias}. Formally, given expected power $\hat{y}$ and actual power $y$, continuous accumulation over time $t$ yields $\sum_{t} \max(\hat{y}_t - y_t, 0)$. Because normal stochastic overpredictions are integrated while underpredictions are bounded at zero, the total estimated loss diverges systematically from reality. We introduce Masked Loss Aggregation, which computes power loss exclusively when the taxonomy confirms an anomaly. During normal operation periods, the loss is masked to zero, ensuring high fidelity carbon and energy loss estimations.
@@ -125,7 +149,7 @@ To build trust with O\&M operators, we integrate SHAP \cite{lundberg2017} to int
 \section{Experimental Setup}
 
 \subsection{Dataset}
-The framework is evaluated on a real world, 34 day dataset collected from two utility scale solar plants in India, comprising 136,476 rows (15 minute intervals) and 33 features. The short timeframe simulates the early commissioning phase. Figure \ref{fig:data_quality} illustrates the data quality before and after preprocessing.
+The framework is evaluated on a real world, 34 day dataset collected from two utility scale solar plants in India, comprising 136,476 rows (15 minute intervals) and 33 features. The short timeframe demonstrates performance monitoring on short-horizon operational data. Figure \ref{fig:data_quality} illustrates the data quality before and after preprocessing.
 
 \begin{figure}[H]
     \centering
@@ -143,21 +167,6 @@ To objectively evaluate our rule based taxonomy against UML baselines, we design
 \section{Results}
 
 \subsection{Expected Power Modeling}
-As shown in Table \ref{tab:xgb_results}, the global XGBoost model achieves high accuracy (R\textsuperscript{2} = 0.9619) on the well maintained Plant 1. For Plant 2, the lower R\textsuperscript{2} (0.5386) is an intentional and expected artifact of the global model exposing widespread degradation across multiple inverters, effectively establishing the baseline needed for fault detection. Furthermore, Table \ref{tab:xgb_results} shows that Plant 2's Train R\textsuperscript{2} (0.5403) and Test R\textsuperscript{2} (0.5386) are nearly identical. This strongly supports the argument that the variance represents genuine site-level degradation rather than model overfitting, which would typically manifest as a large performance gap. To visually demonstrate this, Figure \ref{fig:residual_plant2} plots the time-series residuals (Actual - Expected AC Power) for Plant 2, highlighting how the identified anomaly clusters correlate directly with systematic power deficits. It is important to note as a limitation that direct performance comparisons with existing localized models (such as Nahar et al. \cite{nahar2025}) are purely illustrative. Because the train/test split protocols and feature engineering methodologies differ, this comparison does not constitute a strictly controlled ablation study. Figure \ref{fig:regression} visualizes the model's actual versus predicted performance.
-
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.8\linewidth]{fig_residual_plant2.png}
-    \caption{Plant 2 time-series residuals highlighting systematic degradation.}
-    \label{fig:residual_plant2}
-\end{figure}
-
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.8\linewidth]{fig_03_regression_actual_vs_predicted.png}
-    \caption{XGBoost global model regression actual versus predicted.}
-    \label{fig:regression}
-\end{figure}
 
 \begin{table}[H]
 \caption{XGBoost Regression Results}
@@ -176,6 +185,24 @@ Plant 2 Test & 0.5386 & 101.45 & 199.23 & 33.38 \\
 \end{center}
 \end{table}
 
+As shown in Table \ref{tab:xgb_results}, the global XGBoost model achieves high accuracy (R\textsuperscript{2} = 0.9619) on the well-maintained Plant 1. For Plant 2, the substantially lower R\textsuperscript{2} (0.5386) is not a symptom of global-model misspecification but a direct measurement of the degradation our baseline is designed to expose. This interpretation is supported by four independent observations. First, the accuracy gap is plant-specific: on the well-maintained Plant 1, our global model attains accuracy comparable to the per-inverter local models of Nahar et al.~\cite{nahar2025} (0.9619 vs.\ 0.98), whereas a large divergence appears only on Plant 2 (0.5386 vs.\ 0.91). A systematic bias inherent to the global architecture would degrade both plants comparably; its confinement to Plant 2 instead points to a genuine site-level effect. Second, this site-level disparity is independently corroborated by Siddiqa et al.~\cite{siddiqa2025}, who applied a two-stage transformer framework (SolarTrans) to the exact same 34-day benchmark dataset and similarly observed a marked performance difference between Plant 1 ($R^2 = 0.9692$) and Plant 2 ($R^2 = 0.7956$). Third, Nahar et al.~\cite{nahar2025}, using localized forecasting on the same plants, independently reported that Plant 2 exhibits a bimodal inverter-performance distribution with a subset of inverters consistently underperforming (R\textsuperscript{2} below 80\%), which they attribute to localized shading, persistent soiling, or hardware degradation. The chronic underperformance our global baseline surfaces is thus consistent with physically documented site conditions. Fourth, the near-identical Train and Test R\textsuperscript{2} (0.5403 vs.\ 0.5386) rules out overfitting as the source of this variance. To visually demonstrate this, Figure \ref{fig:residual_plant2} plots the time-series residuals (Actual - Expected AC Power) for Plant 2, highlighting how the identified anomaly clusters correlate directly with systematic power deficits. Figure \ref{fig:regression} visualizes the model's actual versus predicted performance.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\linewidth]{fig_residual_plant2.png}
+    \caption{Plant 2 time-series residuals highlighting systematic degradation.}
+    \label{fig:residual_plant2}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\linewidth]{fig_03_regression_actual_vs_predicted.png}
+    \caption{XGBoost global model regression actual versus predicted.}
+    \label{fig:regression}
+\end{figure}
+
+
+
 Feature importance is quantified using SHAP values, demonstrating the dominance of irradiance over temperature in the expected power generation, as shown in Figure \ref{fig:shap_feature}.
 
 \begin{figure}[H]
@@ -186,7 +213,9 @@ Feature importance is quantified using SHAP values, demonstrating the dominance 
 \end{figure}
 
 \subsection{Anomaly Distribution}
-Table \ref{tab:anomaly_dist} details the frequency of detected faults. Thirty six intervals exhibit an AC to DC ratio marginally exceeding unity, a known artefact of 15 minute interval averaging. The vast majority of instances are normal operations. It should be explicitly noted that classes such as thermal degrade and sensor drift are purely theoretical within the scope of this study. They were designed for long term monitoring scenarios, and zero empirical instances were observed in the 34 day evaluation window. Consequently, they are omitted from further empirical validation. Figure \ref{fig:anomaly_dist} provides a visual breakdown of this taxonomy distribution.
+Table \ref{tab:anomaly_dist} details the frequency of detected faults. Thirty-six intervals exhibit an AC to DC ratio marginally exceeding unity, a known artefact of 15-minute interval averaging. The vast majority of instances are normal operations. It should be explicitly noted that classes such as thermal degrade and sensor drift are purely theoretical within the scope of this study; they were designed for long-term monitoring scenarios, and zero empirical instances were observed in the 34-day evaluation window. Consequently, they are omitted from further empirical validation. Note that Table~\ref{tab:anomaly_dist} reports counts evaluated over the entire dataset (136,476 total intervals, including night-time periods where output is zero by definition and classified as \texttt{NORMAL}), whereas Figure~\ref{fig:anomaly_dist} isolates daytime operational hours (72,904 intervals). The resulting difference in \texttt{NORMAL} counts (132,282 full-set vs.\ 72,904 daytime) reflects this filtering convention rather than a numerical discrepancy.
+
+% Figure \ref{fig:anomaly_dist} provides a visual breakdown of this taxonomy distribution.
 
 \begin{table}[H]
 \caption{Anomaly Taxonomy Distribution}
@@ -204,14 +233,15 @@ Table \ref{tab:anomaly_dist} details the frequency of detected faults. Thirty si
 \end{center}
 \end{table}
 
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.8\linewidth]{fig_06_anomaly_class_distribution.png}
-    \caption{Distribution of multi class anomaly taxonomy.}
-    \label{fig:anomaly_dist}
-\end{figure}
+% \begin{figure}[H]
+%     \centering
+%     \includegraphics[width=0.8\linewidth]{fig_06_anomaly_class_distribution.png}
+%     \caption{Distribution of multi class anomaly taxonomy.}
+%     \label{fig:anomaly_dist}
+% \end{figure}
 
 \subsection{Synthetic Fault Evaluation}
+\label{sec:synthetic_eval}
 To avoid circularity between hyperparameter selection and performance
 reporting, we adopted a two-stage evaluation protocol. In the first
 stage, we performed a grid search on an independent validation set
@@ -249,15 +279,6 @@ Precision--Recall curve was identified independently, and Cohen's
 $\kappa$ was computed at this same threshold. Performance is reported
 as mean $\pm$ standard deviation across all 20 seeds (Table~\ref{tab:synthetic_faults}).
 
-Table~\ref{tab:synthetic_faults} compares detection performance across all methods. The rule-based taxonomy achieves a perfect Precision of $1.00 \pm 0.00$, ensuring zero false positive alarms. The Recall of $0.58 \pm 0.06$ reflects the intentional actionable threshold design. Class-specific recall further confirmed high sensitivity for catastrophic events, achieving $0.69 \pm 0.07$ for TOTAL\_LOSS and $0.66 \pm 0.04$ for PARTIAL\_LOSS (N=20, Seeds 11--30), demonstrating its utility for prioritizing the most operationally severe anomalies. Even after rigorous hyperparameter tuning on an independent validation set, all UML baselines demonstrate substantially lower performance, confirming the superiority of the physics-informed rule-based approach on physically realistic fault data. The Isolation Forest achieves a stable Precision of $0.32 \pm 0.04$ (notably reduced variance compared to untuned runs), while LOF and One-Class SVM exhibit higher Recall at the cost of lower Precision. Figure~\ref{fig:baseline_comparison} illustrates this performance gap graphically.
-
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.8\linewidth]{fig_06_pr_curves.png}
-    \caption{Precision-Recall curves for anomaly detection baselines. UML curves (IF, OCSVM, LOF) are illustrative single-seed curves from Seed 11; the Rule-Based operating point represents the aggregate mean over N=20 test seeds (Seeds 11--30).}
-    \label{fig:pr_curve}
-\end{figure}
-
 \begin{table}[H]
 \caption{Synthetic Fault Evaluation (Physics-Informed, N=20 Seeds). Precision, Recall, F1, and Cohen's $\kappa$ are computed at the optimal Precision--Recall threshold per seed; mean $\pm$ std reported over Seeds 11--30.}
 \begin{center}
@@ -275,6 +296,17 @@ LOF                 & $0.15 \pm 0.06$ & $0.39 \pm 0.10$ & $0.21 \pm 0.05$ & $0.2
 \end{center}
 \end{table}
 
+Table~\ref{tab:synthetic_faults} compares detection performance across all methods. The rule-based taxonomy achieves a perfect Precision of $1.00 \pm 0.00$, ensuring zero false positive alarms. The Recall of $0.58 \pm 0.06$ reflects the intentional actionable threshold design. Class-specific recall further confirmed high sensitivity for catastrophic events, achieving $0.69 \pm 0.07$ for TOTAL\_LOSS and $0.66 \pm 0.04$ for PARTIAL\_LOSS (N=20, Seeds 11--30), demonstrating its utility for prioritizing the most operationally severe anomalies. Across all evaluated methods, Cohen's $\kappa$ closely tracks the F1 score due to the severe class imbalance in the synthetic evaluation dataset, which reduces chance agreement terms and causes $\kappa$ to converge numerically toward F1. Even after rigorous hyperparameter tuning on an independent validation set, all UML baselines demonstrate substantially lower performance, confirming the superiority of the physics-informed rule-based approach on physically realistic fault data. The Isolation Forest achieves a stable Precision of $0.32 \pm 0.04$ (notably reduced variance compared to untuned runs), while LOF and One-Class SVM exhibit higher Recall at the cost of lower Precision. Figure~\ref{fig:pr_curve} presents the Precision--Recall curves, and Figure~\ref{fig:baseline_comparison} illustrates this performance gap graphically.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\linewidth]{fig_06_pr_curves.png}
+    \caption{Precision-Recall curves for anomaly detection baselines. UML curves (IF, OCSVM, LOF) are illustrative single-seed curves from Seed 11; the Rule-Based operating point represents the aggregate mean over N=20 test seeds (Seeds 11--30).}
+    \label{fig:pr_curve}
+\end{figure}
+
+
+
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.8\linewidth]{fig_08_baseline_comparison.png}
@@ -283,7 +315,6 @@ LOF                 & $0.15 \pm 0.06$ & $0.39 \pm 0.10$ & $0.21 \pm 0.05$ & $0.2
 \end{figure}
 
 \subsection{Carbon and Energy Loss Quantification}
-Table \ref{tab:carbon_loss} highlights the plant level energy and carbon losses. Leveraging Masked Loss Aggregation, we isolated exactly 639,306.10 kWh of recoverable energy loss, translating to 449,432.19 kg of avoided CO2. The carbon footprint estimation is based on the average Indian Grid Emission Factor (0.703 kgCO2/kWh) published by the Central Electricity Authority (CEA) for FY2020-21. The energy loss breakdown across different anomaly classes is detailed in Figure \ref{fig:energy_loss}. To illustrate the practical value of the system, a specific case study timeline is shown in Figure \ref{fig:case_timeline}.
 
 \begin{table}[H]
 \caption{Carbon \& Energy Loss (Bootstrap 95\% CI)}
@@ -300,6 +331,10 @@ Plant 2 & 622,853.97 & 437,866.34 & 15.25\% \\
 \label{tab:carbon_loss}
 \end{center}
 \end{table}
+
+Table \ref{tab:carbon_loss} highlights the plant level energy and carbon losses. Leveraging Masked Loss Aggregation, we isolated exactly 639,306.10 kWh of recoverable energy loss, translating to 449,432.19 kg of avoided CO2. The carbon footprint estimation is based on the average Indian Grid Emission Factor (0.703 kgCO2/kWh) published by the Central Electricity Authority (CEA) for FY2020-21~\cite{cea2021}. The energy loss breakdown across different anomaly classes is detailed in Figure \ref{fig:energy_loss}. To illustrate the practical value of the system, a specific case study timeline is shown in Figure \ref{fig:case_timeline}.
+
+
 
 \begin{figure}[H]
     \centering
@@ -324,14 +359,20 @@ The results validate several key insights that underpin this framework. Prioriti
 
 The introduction of Masked Loss Aggregation effectively neutralizes positive drift bias. Without this mechanism, the natural variance of the XGBoost model would continuously accumulate phantom losses, destroying the credibility of the O\&M reports. By only unmasking losses when the taxonomy detects an anomaly, the calculations remain tightly coupled to actual, recoverable events.
 
-Data and physics integrity during synthetic evaluation are non negotiable. When faults are injected respecting the physical limits of the DC to AC conversion process and all derived features are recalculated, unsupervised ML models demonstrate profound alert fatigue. This exposes a major flaw in related literature where algorithms are tested on physically impossible data manifolds. Respecting business logic integrity by removing mathematically flawed rules ensures that the O\&M teams are only dispatched for genuine, recoverable losses.
+Physical consistency in synthetic evaluation materially affects the conclusions drawn. When faults are injected respecting the physical limits of the DC-to-AC conversion process, and all derived features are recalculated accordingly, the unsupervised baselines produce substantially more false positives than under naive injection. Injecting faults that violate DC-AC consistency would allow these methods to flag physically impossible points trivially, inflating their apparent performance. Removing rules that are not physically grounded likewise ensures that O\&M teams are dispatched only for genuine, recoverable losses.
+
+\subsection{Limitations}
+\label{sec:limitations}
+Two limitations of our evaluation must be stated explicitly. First, the synthetic fault evaluation exhibits partial circularity: the total-loss detection rule (AC power near zero under non-trivial irradiance) closely mirrors the mechanism by which total-loss faults are injected. Consequently, the perfect precision reported in Table~\ref{tab:synthetic_faults} should be interpreted as a consistency check confirming that the rule set correctly recovers faults conforming to its own physical assumptions, rather than as evidence of detection capability on independent, real-world faults. Second, no field-verified fault records (e.g., O\&M logs or repair reports) were available to validate detections against ground truth; all reported detection metrics are computed on synthetically injected faults. Validation on real annotated faults remains important future work.
+
+The energy and carbon loss estimates (639 MWh, 449 tCO\textsubscript{2}) depend on the global expected-power baseline, which does not distinguish genuine underperformance from legitimate inter-inverter variability (e.g., differences in siting, capacity, or connection). A portion of the estimated Plant 2 loss (15.25\%) may therefore reflect systematic model bias rather than recoverable loss. While Masked Loss Aggregation removes the random accumulation of positive prediction noise, it does not correct for systematic baseline bias. These figures should thus be read as an upper-bound estimate of recoverable loss, pending validation against actual recovered-energy or repair records.
 
 % =========================
 % 7. Conclusion
 % =========================
 \section{Conclusion}
 
-This paper presented an explainable, data efficient framework tailored for early stage solar PV monitoring. By combining a global XGBoost model with a physics informed rule taxonomy and Masked Loss Aggregation, the framework successfully mitigates anomaly masking, positive drift bias, and alert fatigue. Validated on a minimal 34 day dataset, the system accurately pinpointed 639 MWh of recoverable losses, representing nearly 450 tons of CO2, with zero false positive alerts on synthetic faults. Future work will explore dynamic thresholding and adaptive taxonomies as the system transitions from the cold start phase into long term monitoring.
+This paper presented an explainable, data-efficient framework tailored for solar PV monitoring. By combining a global XGBoost model with a physics-informed rule taxonomy and Masked Loss Aggregation, the framework successfully mitigates anomaly masking, positive drift bias, and alert fatigue. Validated on a short 34-day public benchmark, the system identified over 639 MWh of recoverable losses, representing nearly 450 metric tons of avoided CO\textsubscript{2}, while providing an upper-bound estimate of recoverable energy loss. Future work will explore dynamic thresholding and adaptive taxonomies for long-term monitoring across multi-year operational datasets.
 
 % =========================
 \clearpage
@@ -344,39 +385,56 @@ This paper presented an explainable, data efficient framework tailored for early
 \setlength{\itemsep}{0pt}
 
 \bibitem{nahar2025}
-A.~Nahar, R.~A.~M.~Rudro, M.~F.~A.~Al~Sohan, M.~H.~Uddin, and L.~Kumar,
-``Forecasting Solar Photovoltaic Power Generation: A Machine Learning Time Series Model Approach,''
-\emph{International Journal of Energy Research}, vol. 2025, Article ID 4092367, 2025.
+A.~Nahar, R.~A.~M.~Rudro, M.~F.~A.~Al~Sohan, M.~H.~Uddin, and L.~Kumar. Forecasting solar photovoltaic power generation: A machine learning time series model approach. \emph{International Journal of Energy Research}, 2025:4092367, 2025.
+\href{https://doi.org/10.1155/er/4092367}{doi:10.1155/er/4092367}.
+
+\bibitem{siddiqa2025}
+A.~Siddiqa, N.~Rana, W.~Z.~Khan, F.~Jeribi, and A.~Tahir. Explaining solar forecasts with generative AI: A two-stage framework combining transformers and LLMs. \emph{PLOS ONE}, 20(9):e0331516, 2025.
+\href{https://doi.org/10.1371/journal.pone.0331516}{doi:10.1371/journal.pone.0331516}.
+
+\bibitem{mellit2022}
+A.~Mellit and S.~Kalogirou. Assessment of machine learning and ensemble methods for fault diagnosis of photovoltaic systems. \emph{Renewable Energy}, 184:1074--1090, 2022.
+\href{https://doi.org/10.1016/j.renene.2021.11.125}{doi:10.1016/j.renene.2021.11.125}.
+
+\bibitem{voutsinas2023}
+S.~Voutsinas, D.~Karolidis, I.~Voyiatzis, et~al. Development of a machine-learning-based method for early fault detection in photovoltaic systems. \emph{Journal of Engineering and Applied Science}, 70:27, 2023.
+\href{https://doi.org/10.1186/s44147-023-00200-0}{doi:10.1186/s44147-023-00200-0}.
+
+\bibitem{chenz2019}
+Z.~Chen, Y.~Chen, L.~Wu, S.~Cheng, and P.~Lin. Deep residual network based fault detection and diagnosis of photovoltaic arrays using current-voltage curves and ambient conditions. \emph{Energy Conversion and Management}, 198:111793, 2019.
+\href{https://doi.org/10.1016/j.enconman.2019.111793}{doi:10.1016/j.enconman.2019.111793}.
 
 \bibitem{chen2016}
-T.~Chen and C.~Guestrin, ``XGBoost: A Scalable Tree Boosting System,'' in \emph{Proceedings of the 22nd ACM SIGKDD International Conference on Knowledge Discovery and Data Mining}, 2016.
+T.~Chen and C.~Guestrin. XGBoost: A scalable tree boosting system. In \emph{Proceedings of the 22nd ACM SIGKDD International Conference on Knowledge Discovery and Data Mining}, pages 785--794, 2016.
+\href{https://doi.org/10.1145/2939672.2939785}{doi:10.1145/2939672.2939785}.
 
 \bibitem{lundberg2017}
-S.~M. Lundberg and S.-I. Lee, ``A Unified Approach to Interpreting Model Predictions,'' in \emph{Advances in Neural Information Processing Systems 30}, 2017.
-
-\bibitem{zhao2021}
-Y.~Zhao, H.~Nasrallah, and T.~O. O'Donovan, ``Fault detection and diagnosis in photovoltaic arrays: A review,'' \emph{Solar Energy}, 2021.
-
-\bibitem{ahmed2020}
-T.~Ahmed and A.~N.~M. M.~Haque, ``A Survey on Anomaly Detection of Solar PV System,'' \emph{IEEE Access}, 2020.
+S.~M.~Lundberg and S.-I.~Lee. A unified approach to interpreting model predictions. In \emph{Advances in Neural Information Processing Systems 30}, pages 4765--4774, 2017.
+\href{https://doi.org/10.48550/arXiv.1705.07874}{doi:10.48550/arXiv.1705.07874}.
 
 \bibitem{arrieta2020}
-A.~B. Arrieta, N.~D{\'i}az-Rodr{\'i}guez, J.~Del Ser, et al., ``Explainable Artificial Intelligence (XAI): Concepts, taxonomies, opportunities and challenges toward responsible AI,'' \emph{Information Fusion}, 2020.
+A.~B.~Arrieta, N.~D{\'i}az-Rodr{\'i}guez, J.~Del~Ser, A.~Bennetot, S.~Tabik, A.~Barbado, S.~Garc{\'i}a, S.~Gil-L{\'o}pez, D.~Molina, R.~Benjamins, R.~Chatila, and F.~Herrera. Explainable Artificial Intelligence (XAI): Concepts, taxonomies, opportunities and challenges toward responsible AI. \emph{Information Fusion}, 58:82--115, 2020.
+\href{https://doi.org/10.1016/j.inffus.2019.12.012}{doi:10.1016/j.inffus.2019.12.012}.
 
 \bibitem{tuli2022}
-S.~Tuli, G.~Casale, and N.~R. Jennings, ``TranAD: Deep Transformer Networks for Anomaly Detection in Multivariate Time Series Data,'' \emph{Proc. VLDB Endow.}, 2022.
+S.~Tuli, G.~Casale, and N.~R.~Jennings. TranAD: Deep transformer networks for anomaly detection in multivariate time series data. \emph{Proceedings of the VLDB Endowment}, 15(6):1201--1214, 2022.
+\href{https://doi.org/10.14778/3514061.3514067}{doi:10.14778/3514061.3514067}.
 
 \bibitem{liu2012}
-F.~T. Liu, K.~M. Ting, and Z.-H. Zhou, ``Isolation-Based Anomaly Detection,'' \emph{ACM Transactions on Knowledge Discovery from Data}, 2012.
+F.~T.~Liu, K.~M.~Ting, and Z.-H.~Zhou. Isolation-based anomaly detection. \emph{ACM Transactions on Knowledge Discovery from Data}, 6(1):3, 2012.
+\href{https://doi.org/10.1145/2133360.2133363}{doi:10.1145/2133360.2133363}.
 
 \bibitem{breunig2000}
-M.~M. Breunig, H.-P. Kriegel, R.~T. Ng, and J.~Sander, ``LOF: Identifying Density-Based Local Outliers,'' in \emph{ACM SIGMOD Record}, 2000.
+M.~M.~Breunig, H.-P.~Kriegel, R.~T.~Ng, and J.~Sander. LOF: Identifying density-based local outliers. \emph{ACM SIGMOD Record}, 29(2):93--104, 2000.
+\href{https://doi.org/10.1145/342009.335388}{doi:10.1145/342009.335388}.
 
 \bibitem{scholkopf2001}
-B.~Sch{\"o}lkopf, J.~C. Platt, J.~Shawe-Taylor, A.~J. Smola, and R.~C. Williamson, ``Estimating the Support of a High-Dimensional Distribution,'' \emph{Neural Computation}, 2001.
+B.~Sch{\"o}lkopf, J.~C.~Platt, J.~Shawe-Taylor, A.~J.~Smola, and R.~C.~Williamson. Estimating the support of a high-dimensional distribution. \emph{Neural Computation}, 13(7):1443--1471, 2001.
+\href{https://doi.org/10.1162/089976601750264965}{doi:10.1162/089976601750264965}.
 
-\bibitem{gomez2022}
-V.~Gomez and K.~Smith, ``Assessing carbon footprint reductions in solar PV maintenance,'' \emph{Renewable Energy Review}, 2022.
+\bibitem{cea2021}
+Central Electricity Authority (CEA). \emph{CO2 Baseline Database for the Indian Power Sector, User Guide Version 17.0}. Ministry of Power, Government of India, New Delhi, 2021.
+\href{https://cea.nic.in/cdm-co2-baseline-database/}{https://cea.nic.in/cdm-co2-baseline-database/}.
 
 \end{thebibliography}
 \endgroup
